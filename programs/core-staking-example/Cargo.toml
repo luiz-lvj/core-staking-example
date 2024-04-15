@@ -1,0 +1,25 @@
+[package]
+name = "core-staking-example"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "core_staking_example"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+anchor-spl = { version = "0.29.0", features = ["token", "metadata"]}
+solana-program = "=1.17"
+toml_edit = "=0.21.0"
+ahash = "=0.8.6"
+mpl-core = "0.4.4"
+
