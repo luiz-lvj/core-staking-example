@@ -2,11 +2,7 @@ use anchor_lang::prelude::*;
 use mpl_core::{
     ID as core_program_id,
     Asset,
-    instructions::{
-        AddPluginV1Cpi, AddPluginV1CpiAccounts, AddPluginV1InstructionArgs, 
-        UpdatePluginV1Cpi, UpdatePluginV1CpiAccounts, UpdatePluginV1InstructionArgs,
-        RemovePluginV1Cpi, RemovePluginV1CpiAccounts, RemovePluginV1InstructionArgs,
-    },
+    instructions::{ AddPluginV1CpiBuilder, UpdatePluginV1CpiBuilder, RemovePluginV1CpiBuilder },
     types::{FreezeDelegate, Plugin, PluginType, PluginAuthority, Attribute, Attributes}
 };
 
@@ -16,24 +12,19 @@ declare_id!("J4sLf325UH7YrSUXsNsQs5xCptmS5WuTCYAk6g52phpp");
 pub mod core_staking_example {
     use super::*; 
 
-    pub fn stake(ctx: Context<Stake>) -> Result<()> {      
+    pub fn stake(ctx: Context<Stake>) -> Result<()> {  
+        
+            
         // Freeze the asset  
-        AddPluginV1Cpi::new(
-            ctx.accounts.core_program.to_account_info().as_ref(),
-            AddPluginV1CpiAccounts {
-                asset: ctx.accounts.asset.as_ref(),
-                collection: Some(&ctx.accounts.collection),
-                payer: &ctx.accounts.payer.to_account_info(),
-                authority: Some(&ctx.accounts.signer.to_account_info()),
-                system_program: &ctx.accounts.system_program.to_account_info(),
-                log_wrapper: None,
-            },
-            AddPluginV1InstructionArgs {
-                plugin: Plugin::FreezeDelegate( FreezeDelegate{ frozen: true } ),
-                init_authority: Some(PluginAuthority::UpdateAuthority)
-            }
-        ).invoke()?;
-
+        AddPluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
+            .asset(&ctx.accounts.asset.to_account_info())
+            .collection(Some(&ctx.accounts.collection.to_account_info()))
+            .payer(&ctx.accounts.payer.to_account_info())
+            .authority(Some(&ctx.accounts.signer.to_account_info()))
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .plugin(Plugin::FreezeDelegate( FreezeDelegate{ frozen: true } ))
+            .init_authority(PluginAuthority::UpdateAuthority)
+            .invoke()?;
         
         // Save data on the attributes of the Core Asset
         let info = ctx.accounts.asset.to_account_info();
@@ -41,26 +32,22 @@ pub mod core_staking_example {
         let asset = Asset::deserialize(&data)?;
         
         if asset.plugin_list.attributes.is_none() {
-            AddPluginV1Cpi::new(
-                ctx.accounts.core_program.to_account_info().as_ref(),
-                AddPluginV1CpiAccounts {
-                    asset: ctx.accounts.asset.as_ref(),
-                    collection: Some(&ctx.accounts.collection),
-                    payer: &ctx.accounts.payer.to_account_info(),
-                    authority: Some(&ctx.accounts.update_authority.to_account_info()),
-                    system_program: &ctx.accounts.system_program.to_account_info(),
-                    log_wrapper: None,
-                },
-                AddPluginV1InstructionArgs {
-                    plugin: Plugin::Attributes(
-                        Attributes{ attribute_list: vec![
+            AddPluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
+                .asset(&ctx.accounts.asset.to_account_info())
+                .collection(Some(&ctx.accounts.collection.to_account_info()))
+                .payer(&ctx.accounts.payer.to_account_info())
+                .authority(Some(&ctx.accounts.update_authority.to_account_info()))
+                .system_program(&ctx.accounts.system_program.to_account_info())
+                .plugin(Plugin::Attributes(
+                    Attributes{ 
+                        attribute_list: vec![
                             Attribute { key: "staked".to_string(), value: Clock::get()?.unix_timestamp.to_string() },
                             Attribute { key: "staked_time".to_string(), value: 0.to_string() },
-                        ] }
-                    ),
-                    init_authority: Some(PluginAuthority::UpdateAuthority)
-                }
-            ).invoke()?;
+                        ] 
+                    }
+                ))
+                .init_authority(PluginAuthority::UpdateAuthority)
+                .invoke()?;
         } else {
             let mut attribute_list: Vec<Attribute> = Vec::new();
             let mut is_initialized: bool = false;
@@ -80,20 +67,14 @@ pub mod core_staking_example {
                 attribute_list.push(Attribute { key: "staked_time".to_string(), value: 0.to_string() });
             }
 
-            UpdatePluginV1Cpi::new(
-                ctx.accounts.core_program.to_account_info().as_ref(),
-                UpdatePluginV1CpiAccounts {
-                    asset: ctx.accounts.asset.as_ref(),
-                    collection: Some(&ctx.accounts.collection),
-                    payer: &ctx.accounts.payer.to_account_info(),
-                    authority: Some(&ctx.accounts.update_authority.to_account_info()),
-                    system_program: &ctx.accounts.system_program.to_account_info(),
-                    log_wrapper: None,
-                },
-                UpdatePluginV1InstructionArgs {
-                    plugin: Plugin::Attributes(Attributes{ attribute_list }),
-                }
-            ).invoke()?;
+            UpdatePluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
+                .asset(&ctx.accounts.asset.to_account_info())
+                .collection(Some(&ctx.accounts.collection.to_account_info()))
+                .payer(&ctx.accounts.payer.to_account_info())
+                .authority(Some(&ctx.accounts.update_authority.to_account_info()))
+                .system_program(&ctx.accounts.system_program.to_account_info())
+                .plugin(Plugin::Attributes(Attributes{ attribute_list }))
+                .invoke()?;
         }
 
         Ok(())
@@ -101,36 +82,24 @@ pub mod core_staking_example {
 
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
         // Unfreeze the asset
-        UpdatePluginV1Cpi::new(
-            ctx.accounts.core_program.to_account_info().as_ref(),
-            UpdatePluginV1CpiAccounts {
-                asset: ctx.accounts.asset.as_ref(),
-                collection: Some(&ctx.accounts.collection),
-                payer: &ctx.accounts.payer.to_account_info(),
-                authority: Some(&ctx.accounts.update_authority.to_account_info()),
-                system_program: &ctx.accounts.system_program.to_account_info(),
-                log_wrapper: None,
-            },
-            UpdatePluginV1InstructionArgs {
-                plugin: Plugin::FreezeDelegate(FreezeDelegate {frozen: false}),
-            }
-        ).invoke()?;
+        UpdatePluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
+            .asset(&ctx.accounts.asset.to_account_info())
+            .collection(Some(&ctx.accounts.collection.to_account_info()))
+            .payer(&ctx.accounts.payer.to_account_info())
+            .authority(Some(&ctx.accounts.update_authority.to_account_info()))
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .plugin(Plugin::FreezeDelegate( FreezeDelegate{ frozen: false } ))
+            .invoke()?;
 
         // Remove the FreezeDelegate Plugin
-        RemovePluginV1Cpi::new(
-            ctx.accounts.core_program.to_account_info().as_ref(),
-            RemovePluginV1CpiAccounts {
-                asset: ctx.accounts.asset.as_ref(),
-                collection: Some(&ctx.accounts.collection),
-                payer: &ctx.accounts.payer.to_account_info(),
-                authority: Some(&ctx.accounts.signer.to_account_info()),
-                system_program: &ctx.accounts.system_program.to_account_info(),
-                log_wrapper: None,
-            },
-            RemovePluginV1InstructionArgs {
-                plugin_type: PluginType::FreezeDelegate,
-            }
-        ).invoke()?;
+        RemovePluginV1CpiBuilder::new(&ctx.accounts.core_program)
+            .asset(&ctx.accounts.asset)
+            .collection(Some(&ctx.accounts.collection))
+            .payer(&ctx.accounts.payer)
+            .authority(Some(&ctx.accounts.signer))
+            .system_program(&ctx.accounts.system_program)
+            .plugin_type(PluginType::FreezeDelegate)
+            .invoke()?;
 
         // Save data on the attributes of the Core Asset
         let info = ctx.accounts.asset.to_account_info();
@@ -164,20 +133,14 @@ pub mod core_staking_example {
 
         attribute_list.push(Attribute { key: "staked_time".to_string(), value: staked_time.to_string() });
 
-        UpdatePluginV1Cpi::new(
-            ctx.accounts.core_program.to_account_info().as_ref(),
-            UpdatePluginV1CpiAccounts {
-                asset: ctx.accounts.asset.as_ref(),
-                collection: Some(&ctx.accounts.collection),
-                payer: &ctx.accounts.payer.to_account_info(),
-                authority: Some(&ctx.accounts.update_authority.to_account_info()),
-                system_program: &ctx.accounts.system_program.to_account_info(),
-                log_wrapper: None,
-            },
-            UpdatePluginV1InstructionArgs {
-                plugin: Plugin::Attributes(Attributes{ attribute_list }),
-            }
-        ).invoke()?;
+        UpdatePluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
+            .asset(&ctx.accounts.asset.to_account_info())
+            .collection(Some(&ctx.accounts.collection.to_account_info()))
+            .payer(&ctx.accounts.payer.to_account_info())
+            .authority(Some(&ctx.accounts.update_authority.to_account_info()))
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .plugin(Plugin::Attributes(Attributes{ attribute_list }))
+            .invoke()?;
 
         Ok(())
     }
