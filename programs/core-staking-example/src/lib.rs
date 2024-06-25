@@ -9,7 +9,7 @@ use mpl_core::{
 declare_id!("2X7QEU55T9km1ASAixhJpGfFFVFcpfyC9LDwmDgsitaT");
 
 #[program]
-pub mod jungle_core_staking {
+pub mod core_staking_example {
     use super::*; 
 
     
