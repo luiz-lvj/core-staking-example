@@ -6,11 +6,13 @@ use mpl_core::{
     types::{FreezeDelegate, Plugin, PluginType, PluginAuthority, Attribute, Attributes}
 };
 
-declare_id!("J4sLf325UH7YrSUXsNsQs5xCptmS5WuTCYAk6g52phpp");
+declare_id!("2X7QEU55T9km1ASAixhJpGfFFVFcpfyC9LDwmDgsitaT");
 
 #[program]
-pub mod core_staking_example {
+pub mod jungle_core_staking {
     use super::*; 
+
+    
 
     pub fn stake(ctx: Context<Stake>) -> Result<()> {  
         
@@ -30,6 +32,8 @@ pub mod core_staking_example {
         let info = ctx.accounts.asset.to_account_info();
         let data = info.try_borrow_mut_data()?;
         let asset = Asset::deserialize(&data)?;
+
+        drop(data);
         
         if asset.plugin_list.attributes.is_none() {
             AddPluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
@@ -41,8 +45,9 @@ pub mod core_staking_example {
                 .plugin(Plugin::Attributes(
                     Attributes{ 
                         attribute_list: vec![
-                            Attribute { key: "staked".to_string(), value: Clock::get()?.unix_timestamp.to_string() },
-                            Attribute { key: "staked_time".to_string(), value: 0.to_string() },
+                            Attribute { key: "frozen".to_string(), value: "1".to_string()},
+                            Attribute { key: "staked".to_string(), value: Clock::get()?.unix_timestamp.to_string() }, //timestamp now
+                            Attribute { key: "staked_time".to_string(), value: 0.to_string() }, //timestamp 0
                         ] 
                     }
                 ))
@@ -53,8 +58,11 @@ pub mod core_staking_example {
             let mut is_initialized: bool = false;
 
             for attribute in asset.plugin_list.attributes.unwrap().attributes.attribute_list {
-                if attribute.key == "staked" {
-                    require!(attribute.value == "0", StakingError::AlreadyStaked);
+                if attribute.key == "frozen" {
+                    require!(attribute.value == "0", StakingError::OwnerMismatched);
+                    attribute_list.push(Attribute { key: "frozen".to_string(), value: "1".to_string() });
+                } else if attribute.key == "staked" {
+                    
                     attribute_list.push(Attribute { key: "staked".to_string(), value: Clock::get()?.unix_timestamp.to_string() });
                     is_initialized = true;
                 } else {
@@ -63,6 +71,7 @@ pub mod core_staking_example {
             }
 
             if is_initialized == false {
+                attribute_list.push(Attribute { key: "frozen".to_string(), value: "1".to_string() });
                 attribute_list.push(Attribute { key: "staked".to_string(), value: Clock::get()?.unix_timestamp.to_string() });
                 attribute_list.push(Attribute { key: "staked_time".to_string(), value: 0.to_string() });
             }
@@ -76,6 +85,8 @@ pub mod core_staking_example {
                 .plugin(Plugin::Attributes(Attributes{ attribute_list }))
                 .invoke()?;
         }
+
+        //Asset::serialize(&asset, &mut data)?;
 
         Ok(())
     }
@@ -105,6 +116,8 @@ pub mod core_staking_example {
         let info = ctx.accounts.asset.to_account_info();
         let data = info.try_borrow_mut_data()?;
         let asset = Asset::deserialize(&data)?;
+
+        drop(data);
         
         require!(asset.plugin_list.attributes.is_some(), StakingError::AttributesNotInitialized);
 
@@ -113,8 +126,11 @@ pub mod core_staking_example {
         let mut staked_time: i64 = 0;
 
         for attribute in asset.plugin_list.attributes.unwrap().attributes.attribute_list.iter() {
-            if attribute.key == "staked" {
-                require!(attribute.value != "0", StakingError::NotStaked);
+            if attribute.key == "frozen" {
+                require!(attribute.value == "1", StakingError::NotStaked);
+                
+            } else if attribute.key == "staked" {
+
                 attribute_list.push(Attribute { key: "staked".to_string(), value: Clock::get()?.unix_timestamp.to_string() });
                 staked_time = staked_time
                     .checked_add(Clock::get()?.unix_timestamp.checked_sub(attribute.value.parse::<i64>().map_err(|_| StakingError::InvalidTimestamp)?).ok_or(StakingError::Underflow)?)
@@ -131,6 +147,7 @@ pub mod core_staking_example {
 
         require!(is_initialized, StakingError::StakingNotInitialized);
 
+        attribute_list.push(Attribute { key: "frozen".to_string(), value: "0".to_string() });
         attribute_list.push(Attribute { key: "staked_time".to_string(), value: staked_time.to_string() });
 
         UpdatePluginV1CpiBuilder::new(&ctx.accounts.core_program.to_account_info())
